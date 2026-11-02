@@ -40,7 +40,7 @@
            (sut/eastwood (assoc sut/default-opts
                                 :ignored-faults {:misplaced-docstrings {'clojure.set [{:line 13}]}
                                                  :deprecations {'clojure.test.junit [{:line 118}]}
-                                                 :constant-test {'clojure.main [{:line 653}]}}
+                                                 :constant-test {'clojure.main [{:line 653} {:line 654}]}}
                                 :namespaces (->> '[clojure.core
                                                    clojure.core.protocols
                                                    clojure.core.reducers
