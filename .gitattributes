@@ -1,0 +1,1 @@
+copy-deps-scripts/patches/*.patch whitespace=-blank-at-eol

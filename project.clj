@@ -26,9 +26,9 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :source-paths ~(cond-> ["src" "copied-deps"]
                    eval-in-leiningen? (conj plugin-source-path))
-  :dependencies [[org.clojure/clojure "1.11.3" :scope "provided"]
+  :dependencies [[org.clojure/clojure "1.12.3" :scope "provided"]
                  [org.clojars.brenton/google-diff-match-patch "0.1"]
-                 [org.ow2.asm/asm "9.7"]]
+                 [org.ow2.asm/asm "9.9.1"]]
   :deploy-repositories [["clojars" {:url "https://repo.clojars.org"
                                     :username :env/clojars_username
                                     :password :env/clojars_password
