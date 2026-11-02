@@ -33,11 +33,12 @@ The namespace scanner has Eastwood hooks that a replacement would remove.
 ## Local patches
 
 After relocation, the script applies [analyzer-jvm.patch](patches/analyzer-jvm.patch).
-The patch preserves three changes:
+The patch preserves four changes:
 
 - Namespace-safe macro entries avoid redundant namespace scans during linting.
 - A retry strips nonessential metadata when an emitted method exceeds the JVM size limit.
 - Qualified instance calls preserve receiver casts and overload selection without suppressing ordinary reflection warnings.
+- Parameter tags select the covariant return type when compiler bridge methods share a signature.
 
 Make changes to copied analyzer sources through this patch so regeneration preserves them.
 The patch must apply after a dependency update; an application failure stops the script.

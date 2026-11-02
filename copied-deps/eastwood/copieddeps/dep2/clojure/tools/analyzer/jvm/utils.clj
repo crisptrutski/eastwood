@@ -413,9 +413,15 @@
   [methods]
   (map (fn [ms]
          (reduce (fn [a b]
-                   (if (.isAssignableFrom (maybe-class (:declaring-class a))
-                                          (maybe-class (:declaring-class b)))
-                     b a))
+                   (let [a-class (maybe-class (:declaring-class a))
+                         b-class (maybe-class (:declaring-class b))]
+                     (cond
+                       ;; Covariant bridge methods share a declaring class and parameters.
+                       (= a-class b-class)
+                       (first (try-best-match (:parameter-types a) [a b]))
+
+                       (.isAssignableFrom a-class b-class) b
+                       :else a)))
                  ms))
        (vals (group-by #(mapv maybe-class (:parameter-types %)) methods))))
 
