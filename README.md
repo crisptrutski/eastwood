@@ -1,5 +1,45 @@
 # eastwood - a Clojure lint tool
 
+This fork adds Clojure 1.12 qualified methods and parameter tags to Eastwood 1.4.3.
+It bundles `tools.analyzer.jvm` 1.4.0-beta1 and `tools.reader` 1.6.0.
+The fork targets Clojure 1.12 and tests on Java 17 and 25.
+The analyzer dependency is a beta release.
+
+Override the existing Eastwood dependency with a commit from this fork:
+
+```clojure
+jonase/eastwood {:git/url "https://github.com/crisptrutski/eastwood.git"
+                :git/sha "<full-commit-sha>"}
+```
+
+The shared dependency name keeps one copy of Eastwood on the classpath.
+Deprecation checks for method values require a uniquely resolved method or constructor signature.
+
+Build the reflection fixture, then run the Clojure tests:
+
+```sh
+mkdir -p .circleci/reflection-example/target
+jar cf .circleci/reflection-example/target/reflection-example-0.1.0.jar -C .circleci/reflection-example/src .
+clojure -X:test
+clojure -X:test:third-party-tests
+clojure -X:test:core-tests
+clojure -X:test:var-info-tests
+```
+
+Run each command in its own process. The core suite re-evaluates Clojure namespaces.
+
+Run the dependency refresh tests with:
+
+```sh
+python3 -m unittest discover -s copy-deps-scripts -p 'test_*.py'
+```
+
+Refresh bundled dependencies with `bash copy-deps-scripts/refresh.sh`.
+See [the refresh instructions](copy-deps-scripts/README.md) for version selection and local patches.
+
+The remaining documentation describes upstream Eastwood.
+Use the Git dependency above for this fork.
+
 [![Dependencies Status](https://versions.deps.co/jonase/eastwood/status.svg)](https://versions.deps.co/jonase/eastwood)
 [![Downloads](https://versions.deps.co/jonase/eastwood/downloads.svg)](https://versions.deps.co/jonase/eastwood)
 [![Build Status](https://circleci.com/gh/jonase/eastwood/tree/master.svg?style=shield&circle-token=26d8d2fa593675196734ac6c28ee16e0a9183806)](https://circleci.com/gh/jonase/eastwood)

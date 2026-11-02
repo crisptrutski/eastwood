@@ -61,12 +61,13 @@
                (:eval-out :eval-err) (println (:msg info))
                :default-do-nothing))
         opts (assoc opts :callback cb)
-        {:keys [exception lint-results]} (eastwood.lint/lint-ns ns-sym linters opts)]
-    (if-not exception
-      (->> lint-results
-           (mapcat :lint-warning)
-           (map :warn-data))
-      (throw (:exception exception)))))
+        {:keys [analyzer-exception lint-results]} (eastwood.lint/lint-ns ns-sym linters opts)]
+    (when-let [error (or (:exception analyzer-exception)
+                        (some :exception (mapcat :lint-error lint-results)))]
+      (throw error))
+    (->> lint-results
+         (mapcat :lint-warning)
+         (map :warn-data))))
 
 (defn lint-test [ns-sym linters opts expected-lint-result]
   (let [v (->> (lint-ns-noprint ns-sym linters opts)

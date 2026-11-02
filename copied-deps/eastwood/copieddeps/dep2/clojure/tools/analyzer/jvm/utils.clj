@@ -16,6 +16,8 @@
   (:import (clojure.lang RT Symbol Var)
            org.objectweb.asm.Type))
 
+(set! *warn-on-reflection* true)
+
 (defn ^:private type-reflect
   [typeref & options]
   (apply reflect/type-reflect typeref
@@ -67,13 +69,16 @@
   "Takes a Symbol, String or Class and tires to resolve to a matching Class"
   class)
 
-(defn array-class [element-type]
-  (RT/classForName
-   (str "[" (-> element-type
-              maybe-class
-              Type/getType
-              .getDescriptor
-              (.replace \/ \.)))))
+(defn array-class
+  ([element-type] (array-class 1 element-type))
+  ([n element-type]
+   (RT/classForName
+    (str (apply str (repeat n"["))
+         (-> element-type
+             maybe-class
+             Type/getType
+             .getDescriptor
+             (.replace \/ \.))))))
 
 (defn maybe-class-from-string [^String s]
   (or (when-let [maybe-class (and (neg? (.indexOf s "."))
@@ -90,24 +95,36 @@
 (defmethod maybe-class String [s]
   (maybe-class (symbol s)))
 
+(defn maybe-array-class-sym [x]
+  (let [sname (name x)]
+    (if-let [c (and (= (count sname) 1)
+                    (Character/isDigit (char (first sname)))
+                    (namespace x))]
+      (when-let [c (or (specials c)
+                       (maybe-class-from-string c))]
+        (array-class (Integer/parseInt sname) c)))))
+
 (defmethod maybe-class Symbol [sym]
-  (when-not (namespace sym)
-    (let [sname (name sym)
-          snamec (count sname)]
-      (if-let [base-type (and (.endsWith sname "<>")
-                              (maybe-class (subs sname 0 (- snamec 2))))]
-        (array-class base-type)
-        (if-let [ret (or (specials sname)
-                         (special-arrays sname))]
-          ret
-          (maybe-class-from-string sname))))))
+  (let [sname (name sym)
+        snamec (count sname)]
+    (or (maybe-array-class-sym sym)
+        (when-not (namespace sym)
+          (if-let [base-type (and (.endsWith sname "<>")
+                                  (maybe-class (subs sname 0 (- snamec 2))))]
+            ;; TODO: we're leaking into the syntax
+            (array-class base-type)
+            (if-let [ret (or (specials sname)
+                             (special-arrays sname))]
+              ret
+              (maybe-class-from-string sname)))))))
 
 (defn maybe-class-literal [x]
   (cond
-   (class? x) x
-   (symbol? x) (and (not (namespace x))
-                    (maybe-class-from-string (name x)))
-   (string? x) (maybe-class-from-string x)))
+    (class? x) x
+    (symbol? x) (or (maybe-array-class-sym x)
+                    (and (not (namespace x))
+                         (maybe-class-from-string (name x))))
+    (string? x) (maybe-class-from-string x)))
 
 (def primitive?
   "Returns non-nil if the argument represents a primitive Class other than Void"
@@ -372,6 +389,50 @@
                    :else
                    (conj p next)))) [] methods)
       methods)))
+
+(defn param-tags-of [sym]
+  (-> sym meta :param-tags))
+
+(defn- tags-to-maybe-classes
+  [tags]
+  (mapv (fn [tag]
+          (when-not (= '_ tag)
+            (maybe-class tag)))
+        tags))
+
+(defn- signature-matches?
+  [param-classes method]
+  (let [method-params (:parameter-types method)]
+    (and (= (count param-classes) (count method-params))
+         (every? (fn [[pc mp]]
+                   (or (nil? pc) ;; nil is a wildcard
+                       (= pc (maybe-class mp))))
+                 (map vector param-classes method-params)))))
+
+(defn- most-specific
+  [methods]
+  (map (fn [ms]
+         (reduce (fn [a b]
+                   (let [a-class (maybe-class (:declaring-class a))
+                         b-class (maybe-class (:declaring-class b))]
+                     (cond
+                       ;; Covariant bridge methods share a declaring class and parameters.
+                       (= a-class b-class)
+                       (first (try-best-match (:parameter-types a) [a b]))
+
+                       (.isAssignableFrom a-class b-class) b
+                       :else a)))
+                 ms))
+       (vals (group-by #(mapv maybe-class (:parameter-types %)) methods))))
+
+(defn resolve-hinted-method
+  "Given a class, method name and param-tags, resolves to the unique matching method.
+   Returns nil if no match or if ambiguous."
+  [methods param-tags]
+  (let [param-classes (tags-to-maybe-classes param-tags)
+        matching (most-specific (filter #(signature-matches? param-classes %) methods))]
+    (when (= 1 (count matching))
+      (first matching))))
 
 (defn ns->relpath [s]
   (-> s str (s/replace \. \/) (s/replace \- \_) (str ".clj")))

@@ -1,4 +1,30 @@
 {:paths ["src" "lein-eastwood" "copied-deps" "resource" "resources"]
- :deps {org.clojure/clojure {:mvn/version "1.10.3"}
-        org.clojars.brenton/google-diff-match-patch {:mvn/version "0.1"}
-        org.ow2.asm/asm-all {:mvn/version "5.2"}}}
+ :deps  {org.clojure/clojure                         {:mvn/version "1.12.3"}
+         org.clojars.brenton/google-diff-match-patch {:mvn/version "0.1"}
+         org.ow2.asm/asm                             {:mvn/version "9.9.1"}}
+ :aliases
+ {:vendor {:extra-deps {org.clojure/tools.analyzer.jvm {:mvn/version "1.4.0-beta1"}}}
+  :test   {:extra-paths ["test" "test-resources" "cases"
+                         ".circleci/reflection-example/target/reflection-example-0.1.0.jar"]
+           :extra-deps  {org.clojure/tools.macro {:mvn/version "0.1.5"}
+                         commons-io/commons-io   {:mvn/version "2.4"}
+                         lambdaisland/deep-diff  {:mvn/version "0.0-29"}}
+           :jvm-opts    ["-Deastwood.internal.running-test-suite=true"
+                         "-Djava.awt.headless=true"]
+           :exec-fn     eastwood.test-runner/run}
+  :third-party-tests
+  {:extra-paths ["test-third-party-deps"]
+   :extra-deps  {com.nedap.staffing-solutions/speced.def {:mvn/version "2.0.0"}
+                 com.taoensso/timbre                    {:mvn/version "5.1.2"}
+                 com.taoensso/tufte                     {:mvn/version "2.2.0"}
+                 manifold/manifold                     {:mvn/version "0.1.9-alpha4"}
+                 metosin/spec-tools                    {:mvn/version "0.10.5"}
+                 org.clojure/core.async                 {:mvn/version "1.6.681"}
+                 org.clojure/java.jdbc                  {:mvn/version "0.7.12"}}
+   :exec-args   {:test-paths ["test-third-party-deps"]}}
+  :core-tests
+  {:extra-paths ["clojure-core-test"]
+   :exec-args   {:test-paths ["clojure-core-test"]}}
+  :var-info-tests
+  {:extra-paths ["var-info-test"]
+   :exec-args   {:test-paths ["var-info-test"]}}}}

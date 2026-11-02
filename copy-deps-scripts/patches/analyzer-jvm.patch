@@ -1,0 +1,136 @@
+--- a/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/jvm.clj
++++ b/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/jvm.clj
+@@ -9,7 +9,9 @@
+ (ns eastwood.copieddeps.dep2.clojure.tools.analyzer.jvm
+   "Analyzer for clojure code, extends tools.analyzer with JVM specific passes/forms"
+   (:refer-clojure :exclude [macroexpand-1 macroexpand])
+-  (:require [eastwood.copieddeps.dep1.clojure.tools.analyzer
++  (:require [clojure.test :as test]
++            [clojure.walk :as walk]
++            [eastwood.copieddeps.dep1.clojure.tools.analyzer
+              :as ana
+              :refer [analyze analyze-in-env wrapping-meta analyze-fn-method]
+              :rename {analyze -analyze}]
+@@ -86,12 +88,19 @@
+     #'clojure.core/some->>
+     #'clojure.core/sync
+     #'clojure.core/time
++    #'clojure.core/vswap!
+     #'clojure.core/when
+     #'clojure.core/when-let
+     #'clojure.core/when-not
+     #'clojure.core/while
+     #'clojure.core/with-open
+-    #'clojure.core/with-out-str})
++    #'clojure.core/with-out-str
++    #'clojure.test/are
++    #'clojure.test/deftest
++    #'clojure.test/deftest-
++    #'clojure.test/is
++    #'clojure.test/testing
++    #'clojure.test/try-expr})
+ 
+ (def specials
+   "Set of the special forms for clojure in the JVM"
+@@ -610,9 +619,27 @@
+               :raw-forms  raw-forms})
+            (let [a (analyze mform env opts)
+                  frm (emit-form a)
+-                 result (try (eval frm) ;; eval the emitted form rather than directly the form to avoid double macroexpansion
+-                             (catch Exception e
+-                               (handle-evaluation-exception (ExceptionThrown. e a))))]
++                 ;; NOTE: the retry inside the `catch` is a monkeypatch from Eastwood side.
++                 ;; ------------ begin patch -------------
++                 result (try
++                          ;; eval the emitted form rather than directly the form to avoid double macroexpansion:
++                          (eval frm)
++                          (catch Exception e
++                            (if-not (some-> e .getCause .getMessage #{"Method code too large!"})
++                              (handle-evaluation-exception (ExceptionThrown. e a))
++                              (try
++                                (->> frm
++                                     ;; get rid of non-essential metadata, which bloats code size (git.io/JYOaE):
++                                     (walk/postwalk (fn [x]
++                                                      (if-not (instance? clojure.lang.IObj x)
++                                                        x
++                                                        (vary-meta x dissoc :arglists :file :line :column :end-line :end-column))))
++
++                                     eval)
++                                (catch Exception e
++                                  (handle-evaluation-exception (ExceptionThrown. e a)))))))
++                 ;; ------------ end patch -------------
++                 ]
+              (merge a {:result    result
+                        :raw-forms raw-forms})))))))
+ 
+--- a/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/jvm/utils.clj
++++ b/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/jvm/utils.clj
+@@ -413,9 +413,15 @@
+   [methods]
+   (map (fn [ms]
+          (reduce (fn [a b]
+-                   (if (.isAssignableFrom (maybe-class (:declaring-class a))
+-                                          (maybe-class (:declaring-class b)))
+-                     b a))
++                   (let [a-class (maybe-class (:declaring-class a))
++                         b-class (maybe-class (:declaring-class b))]
++                     (cond
++                       ;; Covariant bridge methods share a declaring class and parameters.
++                       (= a-class b-class)
++                       (first (try-best-match (:parameter-types a) [a b]))
++
++                       (.isAssignableFrom a-class b-class) b
++                       :else a)))
+                  ms))
+        (vals (group-by #(mapv maybe-class (:parameter-types %)) methods))))
+ 
+--- a/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/emit_form.clj
++++ b/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/emit_form.clj
+@@ -138,9 +138,9 @@
+   `(~(symbol (str ".-" (name field))) ~(-emit-form* instance opts)))
+ 
+ (defmethod -emit-form :instance-call
+-  [{:keys [instance method args class param-tags]} opts]
+-  (if param-tags
+-    (let [sym (symbol (class->str class) (str "." (name method)))
++  [{:keys [instance method args class param-tags qualifying-class]} opts]
++  (if (or param-tags qualifying-class)
++    (let [sym (symbol (class->str (or class qualifying-class)) (str "." (name method)))
+           sym (vary-meta sym assoc :param-tags param-tags)]
+       `(~sym ~(-emit-form* instance opts) ~@(mapv #(-emit-form* % opts) args)))
+     `(~(symbol (str "." (name method))) ~(-emit-form* instance opts)
+--- a/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/process_method_value.clj
++++ b/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/process_method_value.clj
+@@ -33,12 +33,13 @@
+       (merge (dissoc ast :fn :args)
+              (case kind
+                :instance
+-               {:op       :instance-call
+-                :method   method
+-                :class    class
+-                :instance (first args)
+-                :args     call-args
+-                :children [:instance :args]}
++               {:op               :instance-call
++                :method           method
++                :class            class
++                :qualifying-class class
++                :instance         (first args)
++                :args             call-args
++                :children         [:instance :args]}
+ 
+                :static
+                {:op       :static-call
+--- a/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/validate.clj
++++ b/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/validate.clj
+@@ -186,8 +186,8 @@
+              :validated? true))))
+ 
+ (defmethod -validate :instance-call
+-  [{:keys [class validated? instance] :as ast}]
+-  (let [class (or class (:tag instance))]
++  [{:keys [class validated? instance qualifying-class] :as ast}]
++  (let [class (or qualifying-class class (:tag instance))]
+     (if (and class (not validated?))
+       (validate-call (assoc ast :class (u/maybe-class class)))
+       ast)))

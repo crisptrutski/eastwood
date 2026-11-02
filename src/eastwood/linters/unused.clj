@@ -343,7 +343,7 @@
 
 (defn unused-exprs-to-check [ast-node]
   (case (:op ast-node)
-    (:const :var :local) [ast-node]
+    (:const :var :local :method-value) [ast-node]
     :invoke (if (util/invoke-expr? ast-node)
               [ast-node]
               [])
@@ -473,7 +473,8 @@
   (case op
     :const "Constant"
     :var "Var"
-    :local "Local"))
+    :local "Local"
+    :method-value "Method"))
 
 ;; Note 1: Report unused :const :var and :local only when linter is
 ;; the regular :unused-ret-vals one, but do so for such values whether
@@ -508,14 +509,14 @@
                                   (mapcat unused-exprs-to-check))
         should-use-ret-val-exprs
         (->> unused-ret-val-exprs
-             (filter #(or (#{:const :var :local} (:op %))
+             (filter #(or (#{:const :var :local :method-value} (:op %))
                           (util/invoke-expr? %)
                           (util/static-call? %)
                           (util/instance-call? %))))]
     (->> (for [stmt should-use-ret-val-exprs]
            ;; See Note 1
            (cond
-             (and (#{:const :var :local} (:op stmt))
+             (and (#{:const :var :local :method-value} (:op stmt))
                   (= location :outside-try))
              (if (or
                   (get stmt :eastwood/defprotocol-expansion-interface) ;; Note 2

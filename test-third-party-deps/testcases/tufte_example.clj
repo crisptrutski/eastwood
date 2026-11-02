@@ -10,7 +10,7 @@
 
 ;;; Let's define a couple dummy fns to simulate doing some expensive work
 (defn get-x [] (Thread/sleep 500)             "x val")
-(defn get-y [] (Thread/sleep (rand-int 1000)) "y val")
+(defn get-y [] (Thread/sleep (long (rand-int 1000))) "y val")
 
 ;; How do these fns perform? Let's check:
 

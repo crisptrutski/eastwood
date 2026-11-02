@@ -264,7 +264,7 @@
 (defn build-memoizer
   "Builds a function that, given a function, returns a pluggable memoized
    version of it.  `build-memoizer` takes a cache factory function, and the
-   argunments to that factory function -- at least one of those arguments
+   arguments to that factory function -- at least one of those arguments
    should be the function to be memoized (it's usually the first argument).
 
   `memoizer` above is a simpler version of `build-memoizer` that 'does the
@@ -449,7 +449,7 @@
 
 (defn ttl
   "Unlike many of the other core.memo memoization functions,
-   `memo-ttl`'s cache policy is time-based rather than algortihmic
+   `memo-ttl`'s cache policy is time-based rather than algorithmic
    or explicit.  When memoizing a function using `memo-ttl` you
    should provide a **T**ime **T**o **L**ive parameter in
    milliseconds.

@@ -1,0 +1,44 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ["17", "25"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+      - uses: DeLaGuardo/setup-clojure@13.7.0
+        with:
+          cli: 1.12.5.1664
+      - name: Test dependency refresh
+        run: python3 -m unittest discover -s copy-deps-scripts -p 'test_*.py'
+      - name: Build the reflection fixture
+        run: |
+          mkdir -p .circleci/reflection-example/target
+          jar cf .circleci/reflection-example/target/reflection-example-0.1.0.jar -C .circleci/reflection-example/src .
+      - name: Run tests
+        run: clojure -X:test
+      - name: Test third-party library compatibility
+        run: clojure -X:test:third-party-tests
+      - name: Test Clojure core in an isolated process
+        run: clojure -X:test:core-tests
+      - name: Test var metadata
+        run: clojure -X:test:var-info-tests
+      - name: Check bundled dependency sources
+        run: |
+          bash copy-deps-scripts/refresh.sh
+          git diff --exit-code -- copied-deps
+          test -z "$(git status --porcelain --untracked-files=all -- copied-deps)"

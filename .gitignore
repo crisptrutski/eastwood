@@ -8,7 +8,13 @@ pom.xml
 .lein-repl-history
 *~
 /target/
+/.cpcache/
+/.eastwood
 /copy-deps-scripts/repos/
 /.circleci/example-red-project/output
 /.circleci/example-green-project/output
 /.circleci/example-refresh-project/output
+
+__pycache__/
+/.clj-kondo/.cache/
+.kata.local.toml

@@ -27,6 +27,8 @@
            java.util.regex.Pattern
            (java.util List LinkedList)))
 
+(set! *warn-on-reflection* true)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; helpers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -264,7 +266,7 @@
          ch (read-char rdr)]
     (if (or (whitespace? ch) (macros ch) (nil? ch))
       (let [s (str sb)]
-        (unread rdr ch)
+        (when ch (unread rdr ch))
         (or (match-number s)
             (err/throw-invalid-number rdr s)))
       (recur (doto sb (.append ch)) (read-char rdr)))))
@@ -378,7 +380,7 @@
       (let [o (read* rdr true nil opts pending-forms)]
         (if (instance? IMeta o)
           (let [m (if (and line (seq? o))
-                    (assoc m :line line :column column)
+                    (merge {:line line :column column} m)
                     m)]
             (if (instance? IObj o)
               (with-meta o (merge (meta o) m))
@@ -759,7 +761,7 @@
                   (ns-name *ns*)
 
                   (= \: (first token))
-                  (some-> token (subs 1) parse-symbol second' symbol resolve-ns ns-name)
+                  (some-> token (subs 1) parse-symbol second' symbol resolve-ns)
 
                   :else
                   (some-> token parse-symbol second'))]
@@ -1022,10 +1024,12 @@
   ([] (read+string (source-logging-push-back-reader *in*)))
   ([stream] (read+string stream true nil))
   ([^SourceLoggingPushbackReader stream eof-error? eof-value]
-   (let [o (log-source stream (read stream eof-error? eof-value))
-         s (.trim (str (:buffer @(.source-log-frames stream))))]
+   (let [^StringBuilder buf (doto ^StringBuilder (:buffer @(.source-log-frames stream)) (.setLength 0))
+         o (log-source stream (read stream eof-error? eof-value))
+         s (.trim (str buf))]
      [o s]))
   ([opts ^SourceLoggingPushbackReader stream]
-   (let [o (log-source stream (read opts stream))
-         s (.trim (str (:buffer @(.source-log-frames stream))))]
+   (let [^StringBuilder buf (doto ^StringBuilder (:buffer @(.source-log-frames stream)) (.setLength 0))
+         o (log-source stream (read opts stream))
+         s (.trim (str buf))]
      [o s])))
