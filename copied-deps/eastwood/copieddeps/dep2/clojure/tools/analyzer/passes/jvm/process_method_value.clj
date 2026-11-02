@@ -33,12 +33,13 @@
       (merge (dissoc ast :fn :args)
              (case kind
                :instance
-               {:op       :instance-call
-                :method   method
-                :class    class
-                :instance (first args)
-                :args     call-args
-                :children [:instance :args]}
+               {:op               :instance-call
+                :method           method
+                :class            class
+                :qualifying-class class
+                :instance         (first args)
+                :args             call-args
+                :children         [:instance :args]}
 
                :static
                {:op       :static-call

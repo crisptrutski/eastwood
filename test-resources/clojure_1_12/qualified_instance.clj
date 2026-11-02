@@ -10,3 +10,15 @@
 
 (defn inherited-object-class [value]
   (String/.getClass value))
+
+(defn loop-string-length [value]
+  (loop [s "a" n 1]
+    (if (pos? n)
+      (recur value 0)
+      (String/.length s))))
+
+(defn hinted-loop-string-length [value]
+  (loop [s "a" n 1]
+    (if (pos? n)
+      (recur value 0)
+      (^[] String/.length s))))

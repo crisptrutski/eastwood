@@ -37,7 +37,7 @@ The patch preserves three changes:
 
 - Namespace-safe macro entries avoid redundant namespace scans during linting.
 - A retry strips nonessential metadata when an emitted method exceeds the JVM size limit.
-- Qualified instance calls retain their resolved class when emitted, preserving receiver casts and overload selection.
+- Qualified instance calls preserve receiver casts and overload selection without suppressing ordinary reflection warnings.
 
 Make changes to copied analyzer sources through this patch so regeneration preserves them.
 The patch must apply after a dependency update; an application failure stops the script.

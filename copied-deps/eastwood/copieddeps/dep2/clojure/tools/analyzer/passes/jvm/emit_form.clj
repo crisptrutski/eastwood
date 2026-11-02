@@ -138,9 +138,9 @@
   `(~(symbol (str ".-" (name field))) ~(-emit-form* instance opts)))
 
 (defmethod -emit-form :instance-call
-  [{:keys [instance method args class param-tags]} opts]
-  (if (or param-tags class)
-    (let [sym (symbol (class->str class) (str "." (name method)))
+  [{:keys [instance method args class param-tags qualifying-class]} opts]
+  (if (or param-tags qualifying-class)
+    (let [sym (symbol (class->str (or class qualifying-class)) (str "." (name method)))
           sym (vary-meta sym assoc :param-tags param-tags)]
       `(~sym ~(-emit-form* instance opts) ~@(mapv #(-emit-form* % opts) args)))
     `(~(symbol (str "." (name method))) ~(-emit-form* instance opts)

@@ -130,3 +130,29 @@
           value        (Object.)]
       (is (empty? warnings))
       (is (= Object (native-class value) (linted-class value))))))
+
+(deftest ordinary-inferred-call-reflection-test
+  (let [warnings (lint-fixture 'clojure-1-12.inferred-instance)]
+    (is (= {:reflection 1} (frequencies (map :linter warnings))))))
+
+(deftest qualified-call-on-widened-loop-local-test
+  (let [namespace-sym 'clojure-1-12.qualified-instance]
+    (require namespace-sym :reload)
+    (let [native-length (fixture-function namespace-sym 'loop-string-length)
+          warnings      (lint-fixture namespace-sym)
+          linted-length (fixture-function namespace-sym 'loop-string-length)]
+      (is (empty? warnings))
+      (is (= 4 (native-length "abcd") (linted-length "abcd")))
+      (is (thrown? ClassCastException (native-length (StringBuilder. "abcd"))))
+      (is (thrown? ClassCastException (linted-length (StringBuilder. "abcd")))))))
+
+(deftest hinted-call-on-widened-loop-local-test
+  (let [namespace-sym 'clojure-1-12.qualified-instance]
+    (require namespace-sym :reload)
+    (let [native-length (fixture-function namespace-sym 'hinted-loop-string-length)
+          warnings      (lint-fixture namespace-sym)
+          linted-length (fixture-function namespace-sym 'hinted-loop-string-length)]
+      (is (empty? warnings))
+      (is (= 4 (native-length "abcd") (linted-length "abcd")))
+      (is (thrown? ClassCastException (native-length (StringBuilder. "abcd"))))
+      (is (thrown? ClassCastException (linted-length (StringBuilder. "abcd")))))))

@@ -186,8 +186,8 @@
              :validated? true))))
 
 (defmethod -validate :instance-call
-  [{:keys [class validated? instance] :as ast}]
-  (let [class (or class (:tag instance))]
+  [{:keys [class validated? instance qualifying-class] :as ast}]
+  (let [class (or qualifying-class class (:tag instance))]
     (if (and class (not validated?))
       (validate-call (assoc ast :class (u/maybe-class class)))
       ast)))

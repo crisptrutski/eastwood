@@ -65,12 +65,51 @@
  
 --- a/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/emit_form.clj
 +++ b/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/emit_form.clj
-@@ -139,7 +139,7 @@
+@@ -138,9 +138,9 @@
+   `(~(symbol (str ".-" (name field))) ~(-emit-form* instance opts)))
  
  (defmethod -emit-form :instance-call
-   [{:keys [instance method args class param-tags]} opts]
+-  [{:keys [instance method args class param-tags]} opts]
 -  (if param-tags
-+  (if (or param-tags class)
-     (let [sym (symbol (class->str class) (str "." (name method)))
+-    (let [sym (symbol (class->str class) (str "." (name method)))
++  [{:keys [instance method args class param-tags qualifying-class]} opts]
++  (if (or param-tags qualifying-class)
++    (let [sym (symbol (class->str (or class qualifying-class)) (str "." (name method)))
            sym (vary-meta sym assoc :param-tags param-tags)]
        `(~sym ~(-emit-form* instance opts) ~@(mapv #(-emit-form* % opts) args)))
+     `(~(symbol (str "." (name method))) ~(-emit-form* instance opts)
+--- a/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/process_method_value.clj
++++ b/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/process_method_value.clj
+@@ -33,12 +33,13 @@
+       (merge (dissoc ast :fn :args)
+              (case kind
+                :instance
+-               {:op       :instance-call
+-                :method   method
+-                :class    class
+-                :instance (first args)
+-                :args     call-args
+-                :children [:instance :args]}
++               {:op               :instance-call
++                :method           method
++                :class            class
++                :qualifying-class class
++                :instance         (first args)
++                :args             call-args
++                :children         [:instance :args]}
+ 
+                :static
+                {:op       :static-call
+--- a/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/validate.clj
++++ b/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/validate.clj
+@@ -186,8 +186,8 @@
+              :validated? true))))
+ 
+ (defmethod -validate :instance-call
+-  [{:keys [class validated? instance] :as ast}]
+-  (let [class (or class (:tag instance))]
++  [{:keys [class validated? instance qualifying-class] :as ast}]
++  (let [class (or qualifying-class class (:tag instance))]
+     (if (and class (not validated?))
+       (validate-call (assoc ast :class (u/maybe-class class)))
+       ast)))
