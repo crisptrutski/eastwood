@@ -1,5 +1,28 @@
 # eastwood - a Clojure lint tool
 
+This fork adds Clojure 1.12 qualified methods and parameter tags to Eastwood 1.4.3.
+It bundles `tools.analyzer.jvm` 1.4.0-beta1 and `tools.reader` 1.6.0.
+The analyzer is a beta release. The fork targets Clojure 1.12 and tests on Java 17 and 25.
+
+Use a commit from this fork as a Clojure CLI dependency:
+
+```clojure
+io.github.crisptrutski/eastwood {:git/sha "<commit-sha>"}
+```
+
+Run the test suite with `clojure -X:test` after you build the reflection fixture:
+
+```sh
+mkdir -p .circleci/reflection-example/target
+jar cf .circleci/reflection-example/target/reflection-example-0.1.0.jar -C .circleci/reflection-example/src .
+clojure -X:test
+```
+
+Refresh the bundled dependencies with `bash copy-deps-scripts/refresh.sh`.
+The `:vendor` alias selects their versions. The script preserves Eastwood's namespace-scanner hooks.
+
+The upstream documentation follows.
+
 [![Dependencies Status](https://versions.deps.co/jonase/eastwood/status.svg)](https://versions.deps.co/jonase/eastwood)
 [![Downloads](https://versions.deps.co/jonase/eastwood/downloads.svg)](https://versions.deps.co/jonase/eastwood)
 [![Build Status](https://circleci.com/gh/jonase/eastwood/tree/master.svg?style=shield&circle-token=26d8d2fa593675196734ac6c28ee16e0a9183806)](https://circleci.com/gh/jonase/eastwood)

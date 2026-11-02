@@ -20,7 +20,7 @@
 
    Setting up the global env is also required, see eastwood.copieddeps.dep1.clojure.tools.analyzer.env
 
-   See clojure.tools.analyzer.core-test for an example on how to setup the analyzer."
+   See eastwood.copieddeps.dep1.clojure.tools.analyzer.core-test for an example on how to setup the analyzer."
   (:refer-clojure :exclude [macroexpand-1 macroexpand var? record? boolean? update-keys update-vals])
   (:require [eastwood.copieddeps.dep1.clojure.tools.analyzer.utils :refer :all]
             [eastwood.copieddeps.dep1.clojure.tools.analyzer.env :as env])
@@ -741,7 +741,8 @@
                     (merge {:form form}
                            (-source-info form env)))))
   (let [[m-or-f field?] (if (and (symbol? m-or-f)
-                                 (= \- (first (name m-or-f))))
+                                 (= \- (first (name m-or-f)))
+                                 (empty? args))
                           [(-> m-or-f name (subs 1) symbol) true]
                           [(if args (cons m-or-f args) m-or-f) false])
         target-expr (analyze-form target (ctx env :ctx/expr))

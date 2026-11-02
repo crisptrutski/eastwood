@@ -9,7 +9,9 @@
 (ns eastwood.copieddeps.dep2.clojure.tools.analyzer.jvm
   "Analyzer for clojure code, extends tools.analyzer with JVM specific passes/forms"
   (:refer-clojure :exclude [macroexpand-1 macroexpand])
-  (:require [eastwood.copieddeps.dep1.clojure.tools.analyzer
+  (:require [clojure.test :as test]
+            [clojure.walk :as walk]
+            [eastwood.copieddeps.dep1.clojure.tools.analyzer
              :as ana
              :refer [analyze analyze-in-env wrapping-meta analyze-fn-method]
              :rename {analyze -analyze}]
@@ -34,6 +36,7 @@
              [box :refer [box]]
              [constant-lifter :refer [constant-lift]]
              [classify-invoke :refer [classify-invoke]]
+             [process-method-value :refer [process-method-value]]
              [validate :refer [validate]]
              [infer-tag :refer [infer-tag]]
              [validate-loop-locals :refer [validate-loop-locals]]
@@ -41,14 +44,14 @@
              [emit-form :refer [emit-form]]]
 
             [clojure.java.io :as io]
-            [clojure.test :as test]
-            [clojure.walk :as walk]
             [eastwood.copieddeps.dep10.clojure.tools.reader :as reader]
             [eastwood.copieddeps.dep10.clojure.tools.reader.reader-types :as readers]
 
             [eastwood.copieddeps.dep3.clojure.core.memoize :refer [memo-clear!]])
   (:import (clojure.lang IObj RT Compiler Var)
            java.net.URL))
+
+(set! *warn-on-reflection* true)
 
 (def ns-safe-macro
   "Clojure macros that are known to not alter namespaces"
@@ -133,9 +136,31 @@
   (let [sym-ns (namespace form)]
     (if-let [target (and sym-ns
                          (not (resolve-ns (symbol sym-ns) env))
-                         (maybe-class-literal sym-ns))]          ;; Class/field
-      (with-meta (list '. target (symbol (str "-" (name form)))) ;; transform to (. Class -field)
-        (meta form))
+                         (maybe-class-literal sym-ns))]
+      (let [opname (name form)
+            opsym (symbol opname)]
+        (cond
+          ;; Array/<n>, leave as is
+          (and (= (count opname) 1)
+               (Character/isDigit (char (first opname))))
+          form
+
+          ;; Class/.method or Class/new, leave as is to be parsed as :maybe-host-form -> :method-value
+          (or (.startsWith ^String opname ".")
+              (= "new" opname))
+          form
+
+          ;; Class/name where name is a static field,  desugar to (. Class -name) as before
+          ;; But if :param-tags are present and methods with the same name exist, then leave as is to go through
+          ;; :method-value path
+          (static-field target opsym)
+          (if (and (param-tags-of form)
+                   (seq (filter :return-type (static-members target opsym))))
+            form
+            (with-meta (list '. target (symbol (str "-" opname)))
+              (meta form)))
+
+          :else form))
       form)))
 
 (defn desugar-host-expr [form env]
@@ -145,13 +170,23 @@
             opns   (namespace op)]
         (if-let [target (and opns
                              (not (resolve-ns (symbol opns) env))
-                             (maybe-class-literal opns))] ; (class/field ..)
+                             (maybe-class-literal opns))]
 
-          (let [op (symbol opname)]
-            (with-meta (list '. target (if (zero? (count expr))
-                                         op
-                                         (list* op expr)))
-              (meta form)))
+          (cond
+           ;; (Class/new args), (Class/.method target args), (^[pt] Class/method args)
+           ;; -> leave as-is, will be analyzed as invoke of method-value
+           (or (= "new" opname)
+               (.startsWith ^String opname ".")
+               (param-tags-of op))
+           form
+
+           ;; (Class/method args) -> (. Class (method args))
+           :else
+           (let [op-sym (symbol opname)]
+             (with-meta (list '. target (if (seq expr)
+                                          (list* op-sym expr)
+                                          op-sym))
+               (meta form))))
 
           (cond
            (.startsWith opname ".")     ; (.foo bar ..)
@@ -458,6 +493,7 @@
     #'box
 
     #'analyze-host-expr
+    #'process-method-value
     #'validate-loop-locals
     #'validate
     #'infer-tag
@@ -598,7 +634,7 @@
                                                       (if-not (instance? clojure.lang.IObj x)
                                                         x
                                                         (vary-meta x dissoc :arglists :file :line :column :end-line :end-column))))
-                                     
+
                                      eval)
                                 (catch Exception e
                                   (handle-evaluation-exception (ExceptionThrown. e a)))))))

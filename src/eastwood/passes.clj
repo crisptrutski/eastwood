@@ -6,6 +6,7 @@
    [eastwood.copieddeps.dep1.clojure.tools.analyzer.env :as env]
    [eastwood.copieddeps.dep1.clojure.tools.analyzer.utils :as utils]
    [eastwood.copieddeps.dep2.clojure.tools.analyzer.jvm :as jvm]
+   [eastwood.copieddeps.dep2.clojure.tools.analyzer.jvm.utils :as jvm-utils]
    [eastwood.util :as util])
   (:import
    (java.lang.reflect Method)))
@@ -53,6 +54,21 @@
             {:class cls, :method-name method-name,
              :arg-types arg-type-vec}))))))
 
+(defn get-method-value
+  "The reflected member when a method value selects exactly one signature."
+  [{member-class :class
+    method-name  :method
+    member-kind  :kind
+    candidates   :methods}]
+  (when (= 1 (count candidates))
+    (let [arg-types (into-array Class (map jvm-utils/maybe-class (:parameter-types (first candidates))))]
+      (try
+        (if (= :ctor member-kind)
+          (.getConstructor ^Class member-class arg-types)
+          (.getMethod ^Class member-class (name method-name) arg-types))
+        (catch NoSuchMethodException _
+          nil)))))
+
 (defn void-method? [^Method m]
   (let [ret-val (.getGenericReturnType m)]
     (= ret-val Void/TYPE)))
@@ -79,6 +95,9 @@
   (if (:validated? ast)
     (assoc ast :reflected-method (get-method ast))
     ast))
+
+(defmethod reflect-validated :method-value [ast]
+  (assoc ast :reflected-method-value (get-method-value ast)))
 
 (defmulti propagate-def-name :op)
 

@@ -3,7 +3,7 @@
    [eastwood.copieddeps.dep1.clojure.tools.analyzer.ast :as ast]
    [eastwood.passes :as pass])
   (:import
-   (java.lang.reflect Constructor Field Method)))
+   (java.lang.reflect AnnotatedElement Constructor Field Method)))
 
 (defn no-constructor-found [ctor-info]
   (when (map? ctor-info)
@@ -79,6 +79,10 @@
       (do (no-method-found :static method)
           false))))
 
+(defmethod deprecated? :method-value [_ ast]
+  (when-let [member (:reflected-method-value ast)]
+    (.isAnnotationPresent ^AnnotatedElement member Deprecated)))
+
 (defmulti deprecated-var :op)
 
 (defmethod deprecated-var :var [expr]
@@ -98,6 +102,13 @@
 
 (defmethod deprecated-var :static-field [expr]
   [(:reflected-field expr) "Static field"])
+
+(defmethod deprecated-var :method-value [expr]
+  [(:reflected-method-value expr)
+   (case (:kind expr)
+     :ctor "Constructor"
+     :static "Static method"
+     :instance "Instance method")])
 
 (defn msg [expr]
   (let [[var type] (deprecated-var expr)]

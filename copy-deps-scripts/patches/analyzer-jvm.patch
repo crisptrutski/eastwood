@@ -1,0 +1,65 @@
+--- a/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/jvm.clj
++++ b/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/jvm.clj
+@@ -9,7 +9,9 @@
+ (ns eastwood.copieddeps.dep2.clojure.tools.analyzer.jvm
+   "Analyzer for clojure code, extends tools.analyzer with JVM specific passes/forms"
+   (:refer-clojure :exclude [macroexpand-1 macroexpand])
+-  (:require [eastwood.copieddeps.dep1.clojure.tools.analyzer
++  (:require [clojure.test :as test]
++            [clojure.walk :as walk]
++            [eastwood.copieddeps.dep1.clojure.tools.analyzer
+              :as ana
+              :refer [analyze analyze-in-env wrapping-meta analyze-fn-method]
+              :rename {analyze -analyze}]
+@@ -86,12 +88,19 @@
+     #'clojure.core/some->>
+     #'clojure.core/sync
+     #'clojure.core/time
++    #'clojure.core/vswap!
+     #'clojure.core/when
+     #'clojure.core/when-let
+     #'clojure.core/when-not
+     #'clojure.core/while
+     #'clojure.core/with-open
+-    #'clojure.core/with-out-str})
++    #'clojure.core/with-out-str
++    #'clojure.test/are
++    #'clojure.test/deftest
++    #'clojure.test/deftest-
++    #'clojure.test/is
++    #'clojure.test/testing
++    #'clojure.test/try-expr})
+ 
+ (def specials
+   "Set of the special forms for clojure in the JVM"
+@@ -610,9 +619,27 @@
+               :raw-forms  raw-forms})
+            (let [a (analyze mform env opts)
+                  frm (emit-form a)
+-                 result (try (eval frm) ;; eval the emitted form rather than directly the form to avoid double macroexpansion
+-                             (catch Exception e
+-                               (handle-evaluation-exception (ExceptionThrown. e a))))]
++                 ;; NOTE: the retry inside the `catch` is a monkeypatch from Eastwood side.
++                 ;; ------------ begin patch -------------
++                 result (try
++                          ;; eval the emitted form rather than directly the form to avoid double macroexpansion:
++                          (eval frm)
++                          (catch Exception e
++                            (if-not (some-> e .getCause .getMessage #{"Method code too large!"})
++                              (handle-evaluation-exception (ExceptionThrown. e a))
++                              (try
++                                (->> frm
++                                     ;; get rid of non-essential metadata, which bloats code size (git.io/JYOaE):
++                                     (walk/postwalk (fn [x]
++                                                      (if-not (instance? clojure.lang.IObj x)
++                                                        x
++                                                        (vary-meta x dissoc :arglists :file :line :column :end-line :end-column))))
++
++                                     eval)
++                                (catch Exception e
++                                  (handle-evaluation-exception (ExceptionThrown. e a)))))))
++                 ;; ------------ end patch -------------
++                 ]
+              (merge a {:result    result
+                        :raw-forms raw-forms})))))))
+ 
