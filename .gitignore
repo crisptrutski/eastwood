@@ -17,3 +17,4 @@ pom.xml
 
 __pycache__/
 /.clj-kondo/.cache/
+.kata.local.toml
