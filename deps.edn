@@ -1,12 +1,14 @@
 {:paths ["src" "lein-eastwood" "copied-deps" "resource" "resources"]
- :deps {org.clojure/clojure {:mvn/version "1.12.3"}
-        org.clojars.brenton/google-diff-match-patch {:mvn/version "0.1"}
-        org.ow2.asm/asm {:mvn/version "9.9.1"}}
+ :deps  {org.clojure/clojure                         {:mvn/version "1.12.3"}
+         org.clojars.brenton/google-diff-match-patch {:mvn/version "0.1"}
+         org.ow2.asm/asm                             {:mvn/version "9.9.1"}}
  :aliases
  {:vendor {:extra-deps {org.clojure/tools.analyzer.jvm {:mvn/version "1.4.0-beta1"}}}
-  :test {:extra-paths ["test" "test-resources" "cases"
-                       ".circleci/reflection-example/target/reflection-example-0.1.0.jar"]
-         :extra-deps {commons-io/commons-io {:mvn/version "2.4"}
-                      lambdaisland/deep-diff {:mvn/version "0.0-29"}}
-         :jvm-opts ["-Deastwood.internal.running-test-suite=true"]
-         :exec-fn eastwood.test-runner/run}}}
+  :test   {:extra-paths ["test" "test-resources" "cases"
+                        ".circleci/reflection-example/target/reflection-example-0.1.0.jar"]
+           :extra-deps  {org.clojure/tools.macro  {:mvn/version "0.1.5"}
+                         commons-io/commons-io   {:mvn/version "2.4"}
+                         lambdaisland/deep-diff {:mvn/version "0.0-29"}}
+           :jvm-opts    ["-Deastwood.internal.running-test-suite=true"
+                         "-Djava.awt.headless=true"]
+           :exec-fn     eastwood.test-runner/run}}}

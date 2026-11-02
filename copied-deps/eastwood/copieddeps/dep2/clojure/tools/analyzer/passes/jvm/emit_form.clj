@@ -139,7 +139,7 @@
 
 (defmethod -emit-form :instance-call
   [{:keys [instance method args class param-tags]} opts]
-  (if param-tags
+  (if (or param-tags class)
     (let [sym (symbol (class->str class) (str "." (name method)))
           sym (vary-meta sym assoc :param-tags param-tags)]
       `(~sym ~(-emit-form* instance opts) ~@(mapv #(-emit-form* % opts) args)))

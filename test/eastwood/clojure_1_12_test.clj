@@ -1,7 +1,9 @@
 (ns eastwood.clojure-1-12-test
   (:require
    [clojure.test :refer [deftest is]]
-   [eastwood.lint :as lint]))
+   [eastwood.lint :as lint])
+  (:import
+   (java.util ArrayList)))
 
 (defn- lint-fixture [namespace-sym]
   (lint/with-memoization-bindings
@@ -39,3 +41,24 @@
     (is (= {:deprecations 4, :reflection 1} (frequencies (map :linter diagnostics))))
     (is (= {:instance-call 1, :new 1, :method-value 2}
            (frequencies (map :kind deprecations))))))
+
+(defn- removal-result [remove-fn]
+  (let [items (ArrayList. ["zero" (int 0)])
+        result (remove-fn items)]
+    {:result result, :remaining (vec items)}))
+
+(deftest qualified-instance-semantics-test
+  (require 'clojure-1-12.qualified-instance :reload)
+  (let [native-length (var-get (requiring-resolve 'clojure-1-12.qualified-instance/string-length))
+        native-remove (var-get (requiring-resolve 'clojure-1-12.qualified-instance/remove-object))
+        {:keys [err warnings]} (lint-fixture 'clojure-1-12.qualified-instance)
+        linted-length (var-get (requiring-resolve 'clojure-1-12.qualified-instance/string-length))
+        linted-remove (var-get (requiring-resolve 'clojure-1-12.qualified-instance/remove-object))]
+    (is (nil? err) (pr-str err))
+    (is (empty? warnings) (pr-str (mapv :kind warnings)))
+    (is (= 3 (native-length "abc") (linted-length "abc")))
+    (is (thrown? ClassCastException (native-length (StringBuilder. "abc"))))
+    (is (thrown? ClassCastException (linted-length (StringBuilder. "abc"))))
+    (is (= {:result true, :remaining ["zero"]}
+           (removal-result native-remove)
+           (removal-result linted-remove)))))
