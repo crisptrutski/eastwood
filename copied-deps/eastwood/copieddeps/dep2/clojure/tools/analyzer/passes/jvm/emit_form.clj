@@ -128,8 +128,8 @@
     (list (symbol (class->str class) (name field)))))
 
 (defmethod -emit-form :static-call
-  [{:keys [class method args param-tags]} opts]
-  (let [sym (symbol (class->str class) (name method))
+  [{:keys [class method args param-tags qualifying-class]} opts]
+  (let [sym (symbol (class->str (or qualifying-class class)) (name method))
         sym (if param-tags (vary-meta sym assoc :param-tags param-tags) sym)]
     `(~sym ~@(mapv #(-emit-form* % opts) args))))
 
@@ -140,7 +140,7 @@
 (defmethod -emit-form :instance-call
   [{:keys [instance method args class param-tags qualifying-class]} opts]
   (if (or param-tags qualifying-class)
-    (let [sym (symbol (class->str (or class qualifying-class)) (str "." (name method)))
+    (let [sym (symbol (class->str (or qualifying-class class)) (str "." (name method)))
           sym (vary-meta sym assoc :param-tags param-tags)]
       `(~sym ~(-emit-form* instance opts) ~@(mapv #(-emit-form* % opts) args)))
     `(~(symbol (str "." (name method))) ~(-emit-form* instance opts)

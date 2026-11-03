@@ -4,7 +4,7 @@
    [eastwood.lint :as lint])
   (:import
    (java.lang.reflect Member)
-   (java.util ArrayList)))
+   (java.util ArrayList Collection LinkedList)))
 
 (defn- lint-fixture
   "Return a fixture's warning data, or throw its analysis exception."
@@ -60,32 +60,65 @@
       (is (= "ist" (fold-case "İſT")))
       (is (= "\uD801\uDC28" (fold-case "\uD801\uDC00"))))))
 
-(deftest qualified-receiver-cast-test
+(defn- native-and-linted
+  "Return a `clojure-1-12.qualified-instance` function as Clojure compiles it and as Eastwood evaluates it.
+  Assert that linting the namespace reports no warnings."
+  [function-name]
   (let [namespace-sym 'clojure-1-12.qualified-instance]
     (require namespace-sym :reload)
-    (let [native-length (fixture-function namespace-sym 'string-length)
-          warnings      (lint-fixture namespace-sym)
-          linted-length (fixture-function namespace-sym 'string-length)]
+    (let [native   (fixture-function namespace-sym function-name)
+          warnings (lint-fixture namespace-sym)
+          linted   (fixture-function namespace-sym function-name)]
       (is (empty? warnings))
-      (is (= 3 (native-length "abc") (linted-length "abc")))
-      (is (thrown? ClassCastException (native-length (StringBuilder. "abc"))))
-      (is (thrown? ClassCastException (linted-length (StringBuilder. "abc")))))))
+      [native linted])))
+
+(deftest qualified-receiver-cast-test
+  (let [[native-length linted-length] (native-and-linted 'string-length)]
+    (is (= 3 (native-length "abc") (linted-length "abc")))
+    (is (thrown? ClassCastException (native-length (StringBuilder. "abc"))))
+    (is (thrown? ClassCastException (linted-length (StringBuilder. "abc"))))))
 
 (defn- removal-result [remove-fn]
-  (let [items  (ArrayList. ["zero" (int 0)])
+  (let [items  (ArrayList. ^Collection (vector "zero" (int 0)))
         result (remove-fn items)]
     {:result result, :remaining (vec items)}))
 
 (deftest qualified-overload-selection-test
-  (let [namespace-sym 'clojure-1-12.qualified-instance]
-    (require namespace-sym :reload)
-    (let [native-remove (fixture-function namespace-sym 'remove-object)
-          warnings      (lint-fixture namespace-sym)
-          linted-remove (fixture-function namespace-sym 'remove-object)]
-      (is (empty? warnings))
-      (is (= {:result true, :remaining ["zero"]}
-             (removal-result native-remove)
-             (removal-result linted-remove))))))
+  (let [[native-remove linted-remove] (native-and-linted 'remove-object)]
+    (is (= {:result true, :remaining ["zero"]}
+           (removal-result native-remove)
+           (removal-result linted-remove)))))
+
+(deftest inherited-qualified-receiver-test
+  (let [[native-class linted-class] (native-and-linted 'inherited-object-class)
+        value                       (Object.)]
+    (is (= Object (native-class value) (linted-class value)))))
+
+(deftest inherited-method-qualifier-test
+  (let [[native-add linted-add] (native-and-linted 'add-inherited)]
+    (is (= true (native-add (ArrayList.)) (linted-add (ArrayList.))))
+    (is (thrown? ClassCastException (native-add (LinkedList.))))
+    (is (thrown? ClassCastException (linted-add (LinkedList.))))))
+
+(deftest qualified-call-on-widened-loop-local-test
+  (let [[native-length linted-length] (native-and-linted 'loop-string-length)]
+    (is (= 4 (native-length "abcd") (linted-length "abcd")))
+    (is (thrown? ClassCastException (native-length (StringBuilder. "abcd"))))
+    (is (thrown? ClassCastException (linted-length (StringBuilder. "abcd"))))))
+
+(deftest hinted-call-on-widened-loop-local-test
+  (let [[native-length linted-length] (native-and-linted 'hinted-loop-string-length)]
+    (is (= 4 (native-length "abcd") (linted-length "abcd")))
+    (is (thrown? ClassCastException (native-length (StringBuilder. "abcd"))))
+    (is (thrown? ClassCastException (linted-length (StringBuilder. "abcd"))))))
+
+(deftest interface-static-method-test
+  (let [e (is (thrown? Exception (lint-fixture 'clojure-1-12.interface-static)))]
+    (is (re-find #"No matching method of found taking 0 args" (str (ex-message (ex-cause e)))))))
+
+(deftest interface-static-method-on-widened-loop-local-test
+  (let [e (is (thrown? Exception (lint-fixture 'clojure-1-12.interface-static-loop)))]
+    (is (re-find #"No matching method of found taking 2 args" (str (ex-message (ex-cause e)))))))
 
 (deftest discarded-qualified-call-test
   (let [warnings (lint-fixture 'clojure-1-12.discarded-result)
@@ -121,38 +154,6 @@
     (is (= #{java.sql.Date}
            (set (map (fn [warning] (.getDeclaringClass ^Member (first (:var warning)))) warnings))))))
 
-(deftest inherited-qualified-receiver-test
-  (let [namespace-sym 'clojure-1-12.qualified-instance]
-    (require namespace-sym :reload)
-    (let [native-class (fixture-function namespace-sym 'inherited-object-class)
-          warnings     (lint-fixture namespace-sym)
-          linted-class (fixture-function namespace-sym 'inherited-object-class)
-          value        (Object.)]
-      (is (empty? warnings))
-      (is (= Object (native-class value) (linted-class value))))))
-
 (deftest ordinary-inferred-call-reflection-test
   (let [warnings (lint-fixture 'clojure-1-12.inferred-instance)]
     (is (= {:reflection 1} (frequencies (map :linter warnings))))))
-
-(deftest qualified-call-on-widened-loop-local-test
-  (let [namespace-sym 'clojure-1-12.qualified-instance]
-    (require namespace-sym :reload)
-    (let [native-length (fixture-function namespace-sym 'loop-string-length)
-          warnings      (lint-fixture namespace-sym)
-          linted-length (fixture-function namespace-sym 'loop-string-length)]
-      (is (empty? warnings))
-      (is (= 4 (native-length "abcd") (linted-length "abcd")))
-      (is (thrown? ClassCastException (native-length (StringBuilder. "abcd"))))
-      (is (thrown? ClassCastException (linted-length (StringBuilder. "abcd")))))))
-
-(deftest hinted-call-on-widened-loop-local-test
-  (let [namespace-sym 'clojure-1-12.qualified-instance]
-    (require namespace-sym :reload)
-    (let [native-length (fixture-function namespace-sym 'hinted-loop-string-length)
-          warnings      (lint-fixture namespace-sym)
-          linted-length (fixture-function namespace-sym 'hinted-loop-string-length)]
-      (is (empty? warnings))
-      (is (= 4 (native-length "abcd") (linted-length "abcd")))
-      (is (thrown? ClassCastException (native-length (StringBuilder. "abcd"))))
-      (is (thrown? ClassCastException (linted-length (StringBuilder. "abcd")))))))

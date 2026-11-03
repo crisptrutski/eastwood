@@ -86,6 +86,17 @@
  
 --- a/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/emit_form.clj
 +++ b/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/emit_form.clj
+@@ -128,8 +128,8 @@
+     (list (symbol (class->str class) (name field)))))
+ 
+ (defmethod -emit-form :static-call
+-  [{:keys [class method args param-tags]} opts]
+-  (let [sym (symbol (class->str class) (name method))
++  [{:keys [class method args param-tags qualifying-class]} opts]
++  (let [sym (symbol (class->str (or qualifying-class class)) (name method))
+         sym (if param-tags (vary-meta sym assoc :param-tags param-tags) sym)]
+     `(~sym ~@(mapv #(-emit-form* % opts) args))))
+ 
 @@ -138,9 +138,9 @@
    `(~(symbol (str ".-" (name field))) ~(-emit-form* instance opts)))
  
@@ -95,7 +106,7 @@
 -    (let [sym (symbol (class->str class) (str "." (name method)))
 +  [{:keys [instance method args class param-tags qualifying-class]} opts]
 +  (if (or param-tags qualifying-class)
-+    (let [sym (symbol (class->str (or class qualifying-class)) (str "." (name method)))
++    (let [sym (symbol (class->str (or qualifying-class class)) (str "." (name method)))
            sym (vary-meta sym assoc :param-tags param-tags)]
        `(~sym ~(-emit-form* instance opts) ~@(mapv #(-emit-form* % opts) args)))
      `(~(symbol (str "." (name method))) ~(-emit-form* instance opts)
@@ -123,7 +134,19 @@
                 {:op       :static-call
 --- a/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/validate.clj
 +++ b/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/validate.clj
-@@ -186,8 +186,8 @@
+@@ -172,7 +172,10 @@
+   [ast]
+   (if (:validated? ast)
+     ast
+-    (validate-call (assoc ast :class (u/maybe-class (:class ast))))))
++    ;; Validation replaces :class with the declaring class. Keep the source class for emission and for
++    ;; revalidation after loop locals widen.
++    (let [class (u/maybe-class (or (:qualifying-class ast) (:class ast)))]
++      (validate-call (assoc ast :class class :qualifying-class class)))))
+ 
+ (defmethod -validate :static-field
+   [{:keys [class validated? field] :as ast}]
+@@ -186,8 +189,8 @@
               :validated? true))))
  
  (defmethod -validate :instance-call

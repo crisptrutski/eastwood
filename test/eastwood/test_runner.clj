@@ -32,5 +32,5 @@
       (run! require namespaces)
       (let [{:keys [fail error]} (apply test/run-tests namespaces)]
         (shutdown-agents)
-        (when (pos? (+ fail error))
+        (when (pos? (+ (long fail) (long error)))
           (System/exit 1))))))

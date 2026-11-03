@@ -15,24 +15,16 @@ jonase/eastwood {:git/url "https://github.com/crisptrutski/eastwood.git"
 The shared dependency name keeps one copy of Eastwood on the classpath.
 Deprecation checks for method values require a uniquely resolved method or constructor signature.
 
-Build the reflection fixture, then run the Clojure tests:
+Run the CI checks locally before pushing:
 
 ```sh
-mkdir -p .circleci/reflection-example/target
-jar cf .circleci/reflection-example/target/reflection-example-0.1.0.jar -C .circleci/reflection-example/src .
-clojure -X:test
-clojure -X:test:third-party-tests
-clojure -X:test:core-tests
-clojure -X:test:var-info-tests
+bin/ci
 ```
 
-Run each command in its own process. The core suite re-evaluates Clojure namespaces.
-
-Run the dependency refresh tests with:
-
-```sh
-python3 -m unittest discover -s copy-deps-scripts -p 'test_*.py'
-```
+The script runs each step in its own process and stops at the first failure.
+Pass step names to run only those steps, for example `bin/ci test lint`.
+The steps are `refresh-tests`, `test`, `third-party`, `core`, `var-info`, `lint` and `drift`.
+Commit first: the `drift` step regenerates the bundled sources and compares them with HEAD.
 
 Refresh bundled dependencies with `bash copy-deps-scripts/refresh.sh`.
 See [the refresh instructions](copy-deps-scripts/README.md) for version selection and local patches.

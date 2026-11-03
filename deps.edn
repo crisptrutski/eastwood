@@ -27,4 +27,9 @@
    :exec-args   {:test-paths ["clojure-core-test"]}}
   :var-info-tests
   {:extra-paths ["var-info-test"]
-   :exec-args   {:test-paths ["var-info-test"]}}}}
+   :exec-args   {:test-paths ["var-info-test"]}}
+  ;; Lint Eastwood with itself. Combine with :test:core-tests:var-info-tests for the test classpaths.
+  ;; The options match :eastwood in project.clj. The CLI splits main-opts on newlines, so keep the map on one line.
+  :lint
+  {:main-opts ["-m" "eastwood.lint"
+               "{:source-paths [\"src\"] :test-paths [\"test\" \"var-info-test\" \"clojure-core-test\"] :add-linters [:boxed-math :performance]}"]}}}

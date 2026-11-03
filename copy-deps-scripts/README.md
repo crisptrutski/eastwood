@@ -33,12 +33,13 @@ The namespace scanner has Eastwood hooks that a replacement would remove.
 ## Local patches
 
 After relocation, the script applies [analyzer-jvm.patch](patches/analyzer-jvm.patch).
-The patch preserves four changes:
+The patch preserves five changes:
 
 - Namespace-safe macro entries avoid redundant namespace scans during linting.
 - A retry strips nonessential metadata when an emitted method exceeds the JVM size limit.
 - Qualified instance calls preserve receiver casts and overload selection without suppressing ordinary reflection warnings.
 - Parameter tags select the covariant return type when compiler bridge methods share a signature.
+- Emitted static and instance calls name the class written in the source, not the class that declares the method.
 
 Make changes to copied analyzer sources through this patch so regeneration preserves them.
 The patch must apply after a dependency update; an application failure stops the script.
@@ -53,7 +54,7 @@ python3 -m unittest discover -s copy-deps-scripts -p 'test_*.py'
 ```
 
 The tests cover namespace routing, generated class names, `.cljc` sources and invalid jar selections.
-Run the Clojure suite with `clojure -X:test` after building the reflection fixture described in the main README.
+Run the Clojure suite with `bin/ci test`.
 Review the generated diff and include it with the dependency or patch change.
 A second refresh must produce no further changes.
 CI regenerates the bundles and rejects tracked or untracked source drift.
