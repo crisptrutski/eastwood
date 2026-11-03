@@ -38,7 +38,7 @@ jobs:
       - name: Test var metadata
         run: clojure -X:test:var-info-tests
       - name: Lint Eastwood with itself
-        run: clojure -M:test:core-tests:var-info-tests -m eastwood.lint '{:source-paths ["src"] :test-paths ["test" "var-info-test" "clojure-core-test"] :add-linters [:boxed-math :performance]}'
+        run: clojure -M:test:core-tests:var-info-tests:lint
       - name: Check bundled dependency sources
         run: |
           bash copy-deps-scripts/refresh.sh
