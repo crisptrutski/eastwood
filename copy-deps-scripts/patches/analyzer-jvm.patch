@@ -134,18 +134,19 @@
                 {:op       :static-call
 --- a/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/validate.clj
 +++ b/copied-deps/eastwood/copieddeps/dep2/clojure/tools/analyzer/passes/jvm/validate.clj
-@@ -172,7 +172,9 @@
+@@ -172,7 +172,10 @@
    [ast]
    (if (:validated? ast)
      ast
 -    (validate-call (assoc ast :class (u/maybe-class (:class ast))))))
-+    (let [class (u/maybe-class (:class ast))]
-+      ;; Validation replaces :class with the declaring class. Keep the source class for emission.
++    ;; Validation replaces :class with the declaring class. Keep the source class for emission and for
++    ;; revalidation after loop locals widen.
++    (let [class (u/maybe-class (or (:qualifying-class ast) (:class ast)))]
 +      (validate-call (assoc ast :class class :qualifying-class class)))))
  
  (defmethod -validate :static-field
    [{:keys [class validated? field] :as ast}]
-@@ -186,8 +188,8 @@
+@@ -186,8 +189,8 @@
               :validated? true))))
  
  (defmethod -validate :instance-call

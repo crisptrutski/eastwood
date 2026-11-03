@@ -116,6 +116,10 @@
   (let [e (is (thrown? Exception (lint-fixture 'clojure-1-12.interface-static)))]
     (is (re-find #"No matching method of found taking 0 args" (str (ex-message (ex-cause e)))))))
 
+(deftest interface-static-method-on-widened-loop-local-test
+  (let [e (is (thrown? Exception (lint-fixture 'clojure-1-12.interface-static-loop)))]
+    (is (re-find #"No matching method of found taking 2 args" (str (ex-message (ex-cause e)))))))
+
 (deftest discarded-qualified-call-test
   (let [warnings (lint-fixture 'clojure-1-12.discarded-result)
         calls    (filter #(= :static-call (:kind %)) warnings)]
