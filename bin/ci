@@ -20,13 +20,17 @@ build_fixture() {
 
 check_drift() {
   # The refresh overwrites copied-deps, and the check compares the result with HEAD.
-  if [ -n "$(git status --porcelain --untracked-files=all -- copied-deps copy-deps-scripts)" ]; then
+  # Assign git output before testing it, so a failed git status stops the script under set -e.
+  local changes
+  changes=$(git status --porcelain --untracked-files=all -- copied-deps copy-deps-scripts)
+  if [ -n "$changes" ]; then
     echo "Commit or stash changes under copied-deps and copy-deps-scripts before the drift check." >&2
     exit 1
   fi
   bash copy-deps-scripts/refresh.sh
   git diff --exit-code -- copied-deps
-  test -z "$(git status --porcelain --untracked-files=all -- copied-deps)"
+  changes=$(git status --porcelain --untracked-files=all -- copied-deps)
+  test -z "$changes"
 }
 
 run_step() {
