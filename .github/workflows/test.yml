@@ -24,23 +24,16 @@ jobs:
         with:
           cli: 1.12.5.1664
       - name: Test dependency refresh
-        run: python3 -m unittest discover -s copy-deps-scripts -p 'test_*.py'
-      - name: Build the reflection fixture
-        run: |
-          mkdir -p .circleci/reflection-example/target
-          jar cf .circleci/reflection-example/target/reflection-example-0.1.0.jar -C .circleci/reflection-example/src .
+        run: bin/ci refresh-tests
       - name: Run tests
-        run: clojure -X:test
+        run: bin/ci test
       - name: Test third-party library compatibility
-        run: clojure -X:test:third-party-tests
+        run: bin/ci third-party
       - name: Test Clojure core in an isolated process
-        run: clojure -X:test:core-tests
+        run: bin/ci core
       - name: Test var metadata
-        run: clojure -X:test:var-info-tests
+        run: bin/ci var-info
       - name: Lint Eastwood with itself
-        run: clojure -M:test:core-tests:var-info-tests:lint
+        run: bin/ci lint
       - name: Check bundled dependency sources
-        run: |
-          bash copy-deps-scripts/refresh.sh
-          git diff --exit-code -- copied-deps
-          test -z "$(git status --porcelain --untracked-files=all -- copied-deps)"
+        run: bin/ci drift

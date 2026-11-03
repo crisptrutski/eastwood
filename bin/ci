@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Run the CI checks. GitHub Actions calls this script one step at a time.
+#
+#   bin/ci              run every step in order, stopping at the first failure
+#   bin/ci test lint    run only the named steps
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+steps=(refresh-tests test third-party core var-info lint drift)
+
+fixture_built=
+build_fixture() {
+  # The test classpath includes a jar of reflection examples.
+  if [ -z "$fixture_built" ]; then
+    mkdir -p .circleci/reflection-example/target
+    jar cf .circleci/reflection-example/target/reflection-example-0.1.0.jar -C .circleci/reflection-example/src .
+    fixture_built=1
+  fi
+}
+
+check_drift() {
+  # The refresh overwrites copied-deps, and the check compares the result with HEAD.
+  if [ -n "$(git status --porcelain --untracked-files=all -- copied-deps copy-deps-scripts)" ]; then
+    echo "Commit or stash changes under copied-deps and copy-deps-scripts before the drift check." >&2
+    exit 1
+  fi
+  bash copy-deps-scripts/refresh.sh
+  git diff --exit-code -- copied-deps
+  test -z "$(git status --porcelain --untracked-files=all -- copied-deps)"
+}
+
+run_step() {
+  echo "== bin/ci $1"
+  case $1 in
+    refresh-tests) python3 -m unittest discover -s copy-deps-scripts -p 'test_*.py' ;;
+    test)          build_fixture; clojure -X:test ;;
+    third-party)   build_fixture; clojure -X:test:third-party-tests ;;
+    core)          build_fixture; clojure -X:test:core-tests ;;
+    var-info)      build_fixture; clojure -X:test:var-info-tests ;;
+    lint)          build_fixture; clojure -M:test:core-tests:var-info-tests:lint ;;
+    drift)         check_drift ;;
+    *)
+      echo "Unknown step: $1. Steps: ${steps[*]}" >&2
+      exit 2
+      ;;
+  esac
+}
+
+if [ $# -eq 0 ]; then
+  set -- "${steps[@]}"
+fi
+for step in "$@"; do
+  run_step "$step"
+done
