@@ -72,7 +72,7 @@
       (is (thrown? ClassCastException (linted-length (StringBuilder. "abc")))))))
 
 (defn- removal-result [remove-fn]
-  (let [items  (ArrayList. ["zero" (int 0)])
+  (let [items  (ArrayList. ^java.util.Collection (vector "zero" (int 0)))
         result (remove-fn items)]
     {:result result, :remaining (vec items)}))
 
