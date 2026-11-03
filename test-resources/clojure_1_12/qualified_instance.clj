@@ -11,6 +11,9 @@
 (defn inherited-object-class [value]
   (String/.getClass value))
 
+(defn add-inherited [items]
+  (ArrayList/.add items 1))
+
 (defn loop-string-length [value]
   (loop [s "a" n 1]
     (if (pos? n)
@@ -22,6 +25,3 @@
     (if (pos? n)
       (recur value 0)
       (^[] String/.length s))))
-
-(defn add-inherited [items]
-  (ArrayList/.add items 1))

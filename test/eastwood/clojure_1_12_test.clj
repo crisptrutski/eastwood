@@ -4,7 +4,7 @@
    [eastwood.lint :as lint])
   (:import
    (java.lang.reflect Member)
-   (java.util ArrayList LinkedList)))
+   (java.util ArrayList Collection LinkedList)))
 
 (defn- lint-fixture
   "Return a fixture's warning data, or throw its analysis exception."
@@ -72,7 +72,7 @@
       (is (thrown? ClassCastException (linted-length (StringBuilder. "abc")))))))
 
 (defn- removal-result [remove-fn]
-  (let [items  (ArrayList. ^java.util.Collection (vector "zero" (int 0)))
+  (let [items  (ArrayList. ^Collection (vector "zero" (int 0)))
         result (remove-fn items)]
     {:result result, :remaining (vec items)}))
 
@@ -131,6 +131,17 @@
       (is (empty? warnings))
       (is (= Object (native-class value) (linted-class value))))))
 
+(deftest inherited-method-qualifier-test
+  (let [namespace-sym 'clojure-1-12.qualified-instance]
+    (require namespace-sym :reload)
+    (let [native-add (fixture-function namespace-sym 'add-inherited)
+          warnings   (lint-fixture namespace-sym)
+          linted-add (fixture-function namespace-sym 'add-inherited)]
+      (is (empty? warnings))
+      (is (= true (native-add (ArrayList.)) (linted-add (ArrayList.))))
+      (is (thrown? ClassCastException (native-add (LinkedList.))))
+      (is (thrown? ClassCastException (linted-add (LinkedList.)))))))
+
 (deftest ordinary-inferred-call-reflection-test
   (let [warnings (lint-fixture 'clojure-1-12.inferred-instance)]
     (is (= {:reflection 1} (frequencies (map :linter warnings))))))
@@ -156,15 +167,3 @@
       (is (= 4 (native-length "abcd") (linted-length "abcd")))
       (is (thrown? ClassCastException (native-length (StringBuilder. "abcd"))))
       (is (thrown? ClassCastException (linted-length (StringBuilder. "abcd")))))))
-
-(deftest inherited-method-keeps-source-qualifier-test
-  (let [namespace-sym 'clojure-1-12.qualified-instance]
-    (require namespace-sym :reload)
-    (let [native-add (fixture-function namespace-sym 'add-inherited)
-          warnings   (lint-fixture namespace-sym)
-          linted-add (fixture-function namespace-sym 'add-inherited)]
-      (is (empty? warnings))
-      (is (true? (native-add (ArrayList.))))
-      (is (true? (linted-add (ArrayList.))))
-      (is (thrown? ClassCastException (native-add (LinkedList.))))
-      (is (thrown? ClassCastException (linted-add (LinkedList.)))))))
