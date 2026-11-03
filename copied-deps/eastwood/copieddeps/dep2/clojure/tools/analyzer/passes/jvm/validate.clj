@@ -172,7 +172,9 @@
   [ast]
   (if (:validated? ast)
     ast
-    (validate-call (assoc ast :class (u/maybe-class (:class ast))))))
+    (let [class (u/maybe-class (:class ast))]
+      ;; Validation replaces :class with the declaring class. Keep the source class for emission.
+      (validate-call (assoc ast :class class :qualifying-class class)))))
 
 (defmethod -validate :static-field
   [{:keys [class validated? field] :as ast}]
