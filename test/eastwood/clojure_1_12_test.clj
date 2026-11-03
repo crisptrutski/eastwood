@@ -4,7 +4,7 @@
    [eastwood.lint :as lint])
   (:import
    (java.lang.reflect Member)
-   (java.util ArrayList)))
+   (java.util ArrayList LinkedList)))
 
 (defn- lint-fixture
   "Return a fixture's warning data, or throw its analysis exception."
@@ -156,3 +156,15 @@
       (is (= 4 (native-length "abcd") (linted-length "abcd")))
       (is (thrown? ClassCastException (native-length (StringBuilder. "abcd"))))
       (is (thrown? ClassCastException (linted-length (StringBuilder. "abcd")))))))
+
+(deftest inherited-method-keeps-source-qualifier-test
+  (let [namespace-sym 'clojure-1-12.qualified-instance]
+    (require namespace-sym :reload)
+    (let [native-add (fixture-function namespace-sym 'add-inherited)
+          warnings   (lint-fixture namespace-sym)
+          linted-add (fixture-function namespace-sym 'add-inherited)]
+      (is (empty? warnings))
+      (is (true? (native-add (ArrayList.))))
+      (is (true? (linted-add (ArrayList.))))
+      (is (thrown? ClassCastException (native-add (LinkedList.))))
+      (is (thrown? ClassCastException (linted-add (LinkedList.)))))))

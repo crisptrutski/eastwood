@@ -22,3 +22,6 @@
     (if (pos? n)
       (recur value 0)
       (^[] String/.length s))))
+
+(defn add-inherited [items]
+  (ArrayList/.add items 1))
