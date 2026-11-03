@@ -28,6 +28,12 @@ clojure -X:test:var-info-tests
 
 Run each command in its own process. The core suite re-evaluates Clojure namespaces.
 
+Lint Eastwood with itself, as CI does:
+
+```sh
+clojure -M:test:core-tests:var-info-tests:lint
+```
+
 Run the dependency refresh tests with:
 
 ```sh
